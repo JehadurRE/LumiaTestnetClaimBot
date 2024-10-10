@@ -8,6 +8,7 @@ param (
 $global:successCount = 0
 $global:failedCount = 0
 $global:rateLimitErrorFound = $false
+$global:notSucceedYet = $true
 $global:response = $null
 $startTime = Get-Date
 
@@ -39,12 +40,26 @@ function Send-Request {
             -ContentType "application/json"
 
         # Check for success
+        $global:notSucceedYet = $false
         $global:successCount++
     }
     catch {
         # Detect rate limit (HTTP 429) error
         if ($_.Exception.Response.StatusCode -eq 429) {
-            $global:rateLimitErrorFound = $true
+
+            $str =$_ -split "`n"
+            
+
+            if ($global:notSucceedYet) {
+                $global:rateLimitMessage = $false
+                write-host "`nDebug: Server Busy " $str "Trying Again" -ForegroundColor Blue 
+            }
+            else {
+                <# Action when all if and elseif conditions are false #>
+                $global:rateLimitErrorFound = $true
+                $global:notSucceedYet = $true
+            }
+            
             # Parse the response body as JSON to capture the "msg" field
 
             # Assign the rate limit message
@@ -74,9 +89,9 @@ function Show-Countdown {
 # Function to update status without clearing the console
 function Update-Status {
     $elapsedTime = (Get-Date) - $startTime
-    Write-Host ("`rTotal successful requests: {0} | Total failed requests: {1} | Time elapsed: {2}" -f `
+    Write-Host ("`rTotal successful requests: {0} | Current Hash: {1} | Time elapsed: {2}" -f `
             $global:successCount, `
-            $global:failedCount, `
+            $global:response, `
             $elapsedTime.ToString("hh\:mm\:ss")) -NoNewline -ForegroundColor Green
 }
 
@@ -84,6 +99,7 @@ function Update-Status {
 $endTime = $startTime.AddMinutes($runtimeInMinutes)
 
 Write-Host "Starting the process. Will run for $runtimeInMinutes minutes or until stopped by the user."
+Write-Host "Requested to drop bug/issues at https://t.me/Cyber_Arm_y/10" -BackgroundColor DarkGreen -ForegroundColor White
 
 # Run the loop until the specified duration is reached
 while ((Get-Date) -lt $endTime) {
